@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Pedidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite;
+            /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-start pt-10 px-4 sm:px-6 lg:px-8">
+
+    <!-- Header / Search Section -->
+    <div class="w-full max-w-3xl mb-8 text-center">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 tracking-tight">Guía de Pedidos</h1>
+        <p class="text-gray-500 mb-8">Busca por Item ID, Inventario o Nombre</p>
+
+        <div class="relative w-full">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input type="text" id="searchInput"
+                class="glass w-full pl-12 pr-4 py-4 rounded-2xl text-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                placeholder="Escribe para buscar..." autofocus>
+            <div id="loadingSpinner" class="absolute inset-y-0 right-0 pr-4 flex items-center hidden">
+                <div class="loader"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsContainer" class="w-full max-w-3xl space-y-4 pb-10">
+        <!-- Las tarjetas de resultados se inyectarán aquí -->
+
+        <!-- Estado inicial / Vacío -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-500">No se encontraron resultados</h3>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const emptyState = document.getElementById('emptyState');
+
+        let debounceTimer;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+
+            clearTimeout(debounceTimer);
+
+            if (query.length < 2) {
+                resultsContainer.innerHTML = '';
+                emptyState.classList.add('hidden');
+                return;
+            }
+
+            loadingSpinner.classList.remove('hidden');
+
+            debounceTimer = setTimeout(() => {
+                fetchResults(query);
+            }, 300); // Espera 300ms después de dejar de escribir
+        });
+
+        async function fetchResults(query) {
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                renderResults(data);
+            } catch (error) {
+                console.error('Error buscando:', error);
+            } finally {
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        function renderResults(results) {
+            resultsContainer.innerHTML = '';
+
+            if (results.length === 0) {
+                emptyState.classList.remove('hidden');
+                resultsContainer.appendChild(emptyState);
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            results.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-2xl p-6 animate-fade-in flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4';
+                card.style.animationDelay = `${index * 0.05}s`; // Stagger animation
+
+                // Lógica de colores para Envío
+                let envioColorClass = 'bg-gray-100 text-gray-600';
+                if (item.envio.toLowerCase().includes('full')) envioColorClass = 'bg-green-100 text-green-700';
+                if (item.envio.toLowerCase().includes('flex')) envioColorClass = 'bg-yellow-100 text-yellow-700';
+                if (item.envio.toLowerCase().includes('colecta')) envioColorClass = 'bg-blue-100 text-blue-700';
+
+                card.innerHTML = `
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-1">
+                            <h2 class="text-xl font-bold text-gray-900">${item.title}</h2>
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold ${envioColorClass}">
+                                ${item.envio}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-500 font-medium mb-3">${item.subtitle}</p>
+                        
+                        ${item.agregados ? `
+                            <div class="mt-4 bg-blue-50/50 rounded-xl p-3 border border-blue-100">
+                                <p class="text-xs text-blue-500 uppercase font-bold tracking-wider mb-1">Agregados / Notas</p>
+                                <p class="text-gray-700 font-medium">${item.agregados}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                resultsContainer.appendChild(card);
+            });
+        }
+    </script>
+</body>
+
+</html>
