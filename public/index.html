@@ -61,7 +61,6 @@
             width: 24px;
             height: 24px;
             -webkit-animation: spin 1s linear infinite;
-            /* Safari */
             animation: spin 1s linear infinite;
         }
 
@@ -102,7 +101,7 @@
 
     <!-- Results Section -->
     <div id="resultsContainer" class="w-full max-w-3xl space-y-4 pb-10">
-        <!-- Las tarjetas de resultados se inyectarán aquí -->
+        <!-- Resultados aquí -->
 
         <!-- Estado inicial / Vacío -->
         <div id="emptyState" class="text-center py-12 hidden">
@@ -124,9 +123,9 @@
 
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
-
+            
             clearTimeout(debounceTimer);
-
+            
             if (query.length < 2) {
                 resultsContainer.innerHTML = '';
                 emptyState.classList.add('hidden');
@@ -134,17 +133,17 @@
             }
 
             loadingSpinner.classList.remove('hidden');
-
+            
             debounceTimer = setTimeout(() => {
                 fetchResults(query);
-            }, 300); // Espera 300ms después de dejar de escribir
+            }, 300);
         });
 
         async function fetchResults(query) {
             try {
                 const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
                 const data = await response.json();
-
+                
                 renderResults(data);
             } catch (error) {
                 console.error('Error buscando:', error);
@@ -166,31 +165,46 @@
 
             results.forEach((item, index) => {
                 const card = document.createElement('div');
-                card.className = 'glass-card rounded-2xl p-6 animate-fade-in flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4';
-                card.style.animationDelay = `${index * 0.05}s`; // Stagger animation
+                card.className = 'glass-card rounded-2xl p-6 animate-fade-in flex flex-col sm:flex-row justify-between items-start gap-6';
+                card.style.animationDelay = `${index * 0.05}s`;
 
-                // Lógica de colores para Envío
-                let envioColorClass = 'bg-gray-100 text-gray-600';
-                if (item.envio.toLowerCase().includes('full')) envioColorClass = 'bg-green-100 text-green-700';
-                if (item.envio.toLowerCase().includes('flex')) envioColorClass = 'bg-yellow-100 text-yellow-700';
-                if (item.envio.toLowerCase().includes('colecta')) envioColorClass = 'bg-blue-100 text-blue-700';
+                // Colores para Envío
+                let envioColorClass = 'bg-gray-100 text-gray-600 border-gray-200';
+                if (item.envio.toLowerCase().includes('full')) envioColorClass = 'bg-green-50 text-green-700 border-green-200';
+                if (item.envio.toLowerCase().includes('flex')) envioColorClass = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                if (item.envio.toLowerCase().includes('colecta')) envioColorClass = 'bg-blue-50 text-blue-700 border-blue-200';
+
+                // Renderizar Agregados como lista vertical
+                let agregadosHTML = '';
+                if (item.agregados && item.agregados.length > 0) {
+                    agregadosHTML = `
+                        <div class="mt-4 bg-blue-50/50 rounded-xl p-4 border border-blue-100 w-full">
+                            <p class="text-xs text-blue-500 uppercase font-bold tracking-wider mb-2">Agregados / Notas</p>
+                            <ul class="space-y-2">
+                                ${item.agregados.map(agregado => `
+                                    <li class="flex items-start">
+                                        <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span class="text-gray-700 font-medium">${agregado}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
 
                 card.innerHTML = `
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-1">
-                            <h2 class="text-xl font-bold text-gray-900">${item.title}</h2>
-                            <span class="px-3 py-1 rounded-full text-xs font-semibold ${envioColorClass}">
-                                ${item.envio}
+                    <div class="flex-1 w-full">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">${item.title}</h2>
+                            <span class="px-4 py-2 rounded-lg text-sm font-bold border ${envioColorClass} shadow-sm">
+                                Cantidad a enviar: ${item.envio}
                             </span>
                         </div>
-                        <p class="text-sm text-gray-500 font-medium mb-3">${item.subtitle}</p>
+                        <p class="text-base text-gray-500 font-medium mb-4">${item.subtitle}</p>
                         
-                        ${item.agregados ? `
-                            <div class="mt-4 bg-blue-50/50 rounded-xl p-3 border border-blue-100">
-                                <p class="text-xs text-blue-500 uppercase font-bold tracking-wider mb-1">Agregados / Notas</p>
-                                <p class="text-gray-700 font-medium">${item.agregados}</p>
-                            </div>
-                        ` : ''}
+                        ${agregadosHTML}
                     </div>
                 `;
 
