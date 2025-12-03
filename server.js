@@ -13,26 +13,27 @@ const PORT = process.env.PORT || 3000;
 // --- CONFIGURACIÓN ---
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1q0qWmIcRAybrxQcYRhJd5s-A1xiEe_VenWEA84Xptso/export?format=csv&gid=1839169689';
 
-// ID DE CARPETA DE DRIVE (El que configuramos antes)
+// ID DE CARPETA DE DRIVE
 const DRIVE_PARENT_FOLDER_ID = '1v-E638QF0AaPr7zywfH2luZvnHXtJujp';
 
-// --- CONFIGURACIÓN DRIVE (MÉTODO SEGURO: VARIABLES DE ENTORNO) ---
+// --- CONFIGURACIÓN DRIVE (VARIABLES DE ENTORNO) ---
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-/* AQUÍ ESTÁ EL CAMBIO IMPORTANTE:
-   En lugar de buscar un archivo, leemos la variable de entorno que pusimos en Railway.
-   Si estamos en local y no tienes la variable, fallará, pero en Railway funcionará perfecto.
-*/
 let auth;
 try {
-    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-    auth = new google.auth.GoogleAuth({
-        credentials: credentials,
-        scopes: SCOPES,
-    });
+    // Intenta leer la variable de entorno de Railway
+    if (process.env.GOOGLE_CREDENTIALS) {
+        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+        auth = new google.auth.GoogleAuth({
+            credentials: credentials,
+            scopes: SCOPES,
+        });
+    } else {
+        // Fallback para local si existe el archivo (opcional)
+        console.warn("Advertencia: No se detectó variable GOOGLE_CREDENTIALS.");
+    }
 } catch (error) {
-    console.error("ERROR CRÍTICO: No se encontró la variable GOOGLE_CREDENTIALS o no es un JSON válido.");
-    console.error("Asegúrate de haber creado la variable en Railway con el contenido del archivo json.");
+    console.error("ERROR CRÍTICO: La variable GOOGLE_CREDENTIALS no es un JSON válido.");
 }
 
 const drive = google.drive({ version: 'v3', auth });
@@ -44,9 +45,11 @@ const upload = multer({
 });
 
 app.use(cors());
-// Corrección para servir archivos estáticos correctamente en Railway
-app.use(express.static(__dirname)); 
 app.use(express.json());
+
+// --- SERVIR ARCHIVOS ESTÁTICOS ---
+// Esto busca archivos (css, js, html) en la raíz del proyecto
+app.use(express.static(__dirname));
 
 // --- CACHÉ ---
 let cachedData = null;
@@ -98,6 +101,8 @@ async function getSheetData() {
 }
 
 async function findOrCreateFolder(folderName, parentId) {
+    if (!auth) throw new Error("No hay credenciales de Google configuradas.");
+    
     let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
     if (parentId) {
         query += ` and '${parentId}' in parents`;
@@ -133,6 +138,8 @@ async function findOrCreateFolder(folderName, parentId) {
 }
 
 async function uploadFileToDrive(fileObject, parentFolderId) {
+    if (!auth) throw new Error("No hay credenciales de Google configuradas.");
+
     const bufferStream = new stream.PassThrough();
     bufferStream.end(fileObject.buffer);
 
@@ -158,7 +165,8 @@ async function uploadFileToDrive(fileObject, parentFolderId) {
     }
 }
 
-// --- ENDPOINTS ---
+// --- ENDPOINTS API ---
+
 app.get('/api/search', async (req, res) => {
     const query = req.query.q ? req.query.q.toLowerCase().trim() : '';
     if (!query) return res.json([]);
@@ -231,6 +239,12 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
         console.error('ERROR UPLOAD:', error);
         res.status(500).json({ error: error.message || 'Error al subir' });
     }
+});
+
+// --- RUTA PRINCIPAL (SOLUCIÓN DEL ERROR) ---
+// Esto obliga al servidor a entregar el index.html cuando entras a la página
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
