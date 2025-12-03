@@ -12,12 +12,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- CONFIGURACIÓN ---
-// REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE SHEETS (Debe terminar en /export?format=csv)
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1q0qWmIcRAybrxQcYRhJd5s-A1xiEe_VenWEA84Xptso/export?format=csv&gid=1839169689';
+
+// *** IMPORTANTE: PEGA AQUÍ EL ID DE LA CARPETA DE DRIVE QUE COMPARTISTE CON EL ROBOT ***
+// Ejemplo: const DRIVE_PARENT_FOLDER_ID = '1abcDEfghIjkLMnoPqrstUVwxYz';
+const DRIVE_PARENT_FOLDER_ID = '1v-E638QF0AaPr7zywfH2luZvnHXtJujp';
 
 // --- CONFIGURACIÓN DRIVE ---
 const KEYFILE_PATH = path.join(__dirname, 'google-credentials.json');
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+const SCOPES = ['https://www.googleapis.com/auth/drive']; // Scope más amplio para evitar errores de permisos
 
 const auth = new google.auth.GoogleAuth({
     keyFile: KEYFILE_PATH,
@@ -29,20 +32,34 @@ const drive = google.drive({ version: 'v3', auth });
 // --- CONFIGURACIÓN MULTER ---
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB límite
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 app.use(cors());
-app.use(express.static('public'));
+app.use(express.static('public')); // Si usas carpeta public
+app.use(express.static(__dirname)); // Fallback por si los archivos están en la raíz
 app.use(express.json());
 
-// --- CACHÉ SIMPLE ---
+// --- CACHÉ ---
 let cachedData = null;
 let cachedEnvioId = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const CACHE_DURATION = 5 * 60 * 1000;
 
-// --- FUNCIÓN PARA OBTENER DATOS ---
+// --- FUNCIÓN HELPER: OBTENER COLUMNA S (ID ENVÍO) ---
+function getEnvioIdFromRow(row, keys) {
+    // Intento 1: Buscar por nombre exacto si existe
+    if (row['ID ENVIO']) return row['ID ENVIO'];
+    if (row['ENVIO ID']) return row['ENVIO ID'];
+    
+    // Intento 2: Buscar por posición (Columna S es la 19, índice 18)
+    // Aseguramos que el índice exista
+    if (keys.length > 18) {
+        return row[keys[18]]; 
+    }
+    return 'SIN_ID';
+}
+
 async function getSheetData() {
     const now = Date.now();
     if (cachedData && (now - lastFetchTime < CACHE_DURATION)) {
@@ -50,52 +67,43 @@ async function getSheetData() {
     }
 
     try {
-        console.log('Fetching data from Google Sheets...');
-        if (GOOGLE_SHEET_CSV_URL === 'TU_URL_DE_GOOGLE_SHEETS_AQUI') {
-            // Datos de prueba
-            return {
-                data: [],
-                envioId: 'TEST-123'
-            };
-        }
-
+        console.log('Fetching Google Sheet...');
         const response = await axios.get(GOOGLE_SHEET_CSV_URL);
-        const csvData = response.data;
-
-        const parsed = Papa.parse(csvData, {
+        
+        const parsed = Papa.parse(response.data, {
             header: true,
             skipEmptyLines: true,
         });
 
-        // Extraer ID DE ENVÍO de la celda S2 (Fila 0 del array de datos parseados, columna 18 si es 0-indexed, o por nombre si header es true)
-        // PapaParse con header:true devuelve un array de objetos.
-        // La fila 2 del Excel es el primer elemento del array `parsed.data` (índice 0).
-        // La columna S es la 19ª columna.
-        // Vamos a intentar acceder por índice de keys si el nombre de la columna varía, o asumir que las keys están en orden.
-
-        let envioId = 'DESCONOCIDO';
+        let envioId = 'SIN_ID';
         if (parsed.data && parsed.data.length > 0) {
+            // Usamos la primera fila de datos para leer la celda S2 (que se repite en la columna)
+            // Ojo: En CSV exportado, la fila 1 es headers. parsed.data[0] es la fila 2 del Excel.
             const firstRow = parsed.data[0];
             const keys = Object.keys(firstRow);
-            // S es la columna 19. En array 0-indexed es 18.
-            if (keys.length > 18) {
-                envioId = firstRow[keys[18]]; // Columna S
-            }
+            
+            envioId = getEnvioIdFromRow(firstRow, keys);
+            
+            // Limpieza básica del ID
+            if(envioId) envioId = envioId.trim();
         }
 
         cachedData = parsed.data;
         cachedEnvioId = envioId;
         lastFetchTime = now;
+        console.log('Datos actualizados. ID Envio actual:', cachedEnvioId);
         return { data: cachedData, envioId: cachedEnvioId };
     } catch (error) {
-        console.error('Error fetching Google Sheet:', error.message);
+        console.error('Error fetching Sheet:', error.message);
         throw error;
     }
 }
 
-// --- FUNCIONES HELPER DRIVE ---
-async function findOrCreateFolder(folderName, parentId = null) {
+// --- FUNCIONES DRIVE ---
+async function findOrCreateFolder(folderName, parentId) {
+    // Importante: Buscamos solo carpetas que no estén en la papelera
     let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
+    
     if (parentId) {
         query += ` and '${parentId}' in parents`;
     }
@@ -108,9 +116,10 @@ async function findOrCreateFolder(folderName, parentId = null) {
         });
 
         if (res.data.files.length > 0) {
+            console.log(`Carpeta encontrada: ${folderName} (${res.data.files[0].id})`);
             return res.data.files[0].id;
         } else {
-            // Crear carpeta
+            console.log(`Creando carpeta: ${folderName} dentro de ${parentId || 'root'}`);
             const fileMetadata = {
                 name: folderName,
                 mimeType: 'application/vnd.google-apps.folder',
@@ -125,7 +134,7 @@ async function findOrCreateFolder(folderName, parentId = null) {
             return file.data.id;
         }
     } catch (err) {
-        console.error('Error en Drive findOrCreateFolder:', err);
+        console.error('Error Drive findOrCreate:', err);
         throw err;
     }
 }
@@ -149,43 +158,35 @@ async function uploadFileToDrive(fileObject, parentFolderId) {
             media: media,
             fields: 'id',
         });
+        console.log('Archivo subido con ID:', file.data.id);
         return file.data.id;
     } catch (err) {
-        console.error('Error subiendo archivo a Drive:', err);
+        console.error('Error Drive Upload:', err);
         throw err;
     }
 }
 
-// --- API ENDPOINTS ---
+// --- ENDPOINTS ---
 
 app.get('/api/search', async (req, res) => {
     const query = req.query.q ? req.query.q.toLowerCase().trim() : '';
-
-    if (!query) {
-        return res.json([]);
-    }
+    if (!query) return res.json([]);
 
     try {
         const { data } = await getSheetData();
-
-        const results = data.filter(row => {
-            return Object.values(row).some(val =>
-                String(val).toLowerCase().includes(query)
-            );
-        });
+        const results = data.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query)));
 
         const cleanResults = results.map(row => {
             const keys = Object.keys(row);
-
+            // Mapeo robusto
             const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
-            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
-
-            // Agregados: Columnas N(13), O(14), P(15), Q(16)
+            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D'; // Ajustar índice según tu hoja real si falla
+            
+            // Agregados N(13) a Q(16). Ajusta índices si moviste columnas.
             const agregados = [];
-            if (keys[13] && row[keys[13]]) agregados.push(row[keys[13]]);
-            if (keys[14] && row[keys[14]]) agregados.push(row[keys[14]]);
-            if (keys[15] && row[keys[15]]) agregados.push(row[keys[15]]);
-            if (keys[16] && row[keys[16]]) agregados.push(row[keys[16]]);
+            [13, 14, 15, 16].forEach(idx => {
+                if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
+            });
 
             return {
                 title: itemId,
@@ -194,11 +195,10 @@ app.get('/api/search', async (req, res) => {
                 agregados: agregados
             };
         });
-
         res.json(cleanResults);
-
     } catch (error) {
-        res.status(500).json({ error: 'Error al procesar la búsqueda' });
+        console.error(error);
+        res.status(500).json({ error: 'Error búsqueda' });
     }
 });
 
@@ -207,19 +207,17 @@ app.get('/api/envio-id', async (req, res) => {
         const { envioId } = await getSheetData();
         res.json({ envioId });
     } catch (error) {
-        res.status(500).json({ error: 'Error obteniendo ID de envío' });
+        res.status(500).json({ error: 'Error ID' });
     }
 });
 
 app.post('/api/refresh', async (req, res) => {
-    cachedData = null;
-    cachedEnvioId = null;
-    lastFetchTime = 0;
+    cachedData = null; 
     try {
         const { envioId } = await getSheetData();
-        res.json({ success: true, message: 'Datos actualizados', envioId });
+        res.json({ success: true, envioId });
     } catch (error) {
-        res.status(500).json({ error: 'Error al actualizar datos' });
+        res.status(500).json({ error: 'Error refresh' });
     }
 });
 
@@ -227,33 +225,39 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     const { itemId } = req.body;
     const file = req.file;
 
-    if (!file || !itemId) {
-        return res.status(400).json({ error: 'Faltan datos (archivo o itemId)' });
+    console.log(`Intentando subir foto para Item: ${itemId}`);
+
+    if (!file || !itemId) return res.status(400).json({ error: 'Faltan datos' });
+    if (DRIVE_PARENT_FOLDER_ID === 'AQUI_PEGA_TU_ID_DE_CARPETA') {
+        return res.status(500).json({ error: 'Falta configurar el ID de la carpeta Drive en server.js' });
     }
 
     try {
-        // 1. Obtener ID DE ENVÍO actual
+        // 1. Obtener ID Envío
         const { envioId } = await getSheetData();
         const safeEnvioId = envioId ? envioId.replace(/[^a-zA-Z0-9-_]/g, '_') : 'SIN_ID';
         const safeItemId = itemId.replace(/[^a-zA-Z0-9-_]/g, '_');
 
-        // 2. Buscar/Crear carpeta ID ENVÍO (en raíz)
-        const envioFolderId = await findOrCreateFolder(safeEnvioId);
+        console.log(`Estructura: [${DRIVE_PARENT_FOLDER_ID}] -> [${safeEnvioId}] -> [${safeItemId}]`);
 
-        // 3. Buscar/Crear carpeta ITEM ID (dentro de ID ENVÍO)
+        // 2. Buscar/Crear carpeta ENVIO dentro de la carpeta MAESTRA
+        const envioFolderId = await findOrCreateFolder(safeEnvioId, DRIVE_PARENT_FOLDER_ID);
+
+        // 3. Buscar/Crear carpeta ITEM dentro de carpeta ENVIO
         const itemFolderId = await findOrCreateFolder(safeItemId, envioFolderId);
 
-        // 4. Subir archivo
+        // 4. Subir
         const fileId = await uploadFileToDrive(file, itemFolderId);
 
-        res.json({ success: true, fileId: fileId });
+        res.json({ success: true, fileId });
 
     } catch (error) {
-        console.error('Error en upload:', error);
-        res.status(500).json({ error: 'Error al subir archivo a Drive' });
+        console.error('ERROR FINAL EN UPLOAD:', error);
+        // Devolvemos el error detallado al frontend para que lo veas en la alerta si falla
+        res.status(500).json({ error: error.message || 'Error interno al subir' });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor listo en puerto ${PORT}`);
 });
