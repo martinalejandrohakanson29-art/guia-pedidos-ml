@@ -6,7 +6,6 @@ const path = require('path');
 const { google } = require('googleapis');
 const multer = require('multer');
 const stream = require('stream');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,18 +13,27 @@ const PORT = process.env.PORT || 3000;
 // --- CONFIGURACIÓN ---
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1q0qWmIcRAybrxQcYRhJd5s-A1xiEe_VenWEA84Xptso/export?format=csv&gid=1839169689';
 
-// *** IMPORTANTE: PEGA AQUÍ EL ID DE LA CARPETA DE DRIVE QUE COMPARTISTE CON EL ROBOT ***
-// Ejemplo: const DRIVE_PARENT_FOLDER_ID = '1abcDEfghIjkLMnoPqrstUVwxYz';
+// ID DE CARPETA DE DRIVE (El que configuramos antes)
 const DRIVE_PARENT_FOLDER_ID = '1v-E638QF0AaPr7zywfH2luZvnHXtJujp';
 
-// --- CONFIGURACIÓN DRIVE ---
-const KEYFILE_PATH = path.join(__dirname, 'google-credentials.json');
-const SCOPES = ['https://www.googleapis.com/auth/drive']; // Scope más amplio para evitar errores de permisos
+// --- CONFIGURACIÓN DRIVE (MÉTODO SEGURO: VARIABLES DE ENTORNO) ---
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const auth = new google.auth.GoogleAuth({
-    keyFile: KEYFILE_PATH,
-    scopes: SCOPES,
-});
+/* AQUÍ ESTÁ EL CAMBIO IMPORTANTE:
+   En lugar de buscar un archivo, leemos la variable de entorno que pusimos en Railway.
+   Si estamos en local y no tienes la variable, fallará, pero en Railway funcionará perfecto.
+*/
+let auth;
+try {
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: SCOPES,
+    });
+} catch (error) {
+    console.error("ERROR CRÍTICO: No se encontró la variable GOOGLE_CREDENTIALS o no es un JSON válido.");
+    console.error("Asegúrate de haber creado la variable en Railway con el contenido del archivo json.");
+}
 
 const drive = google.drive({ version: 'v3', auth });
 
@@ -36,8 +44,8 @@ const upload = multer({
 });
 
 app.use(cors());
-app.use(express.static('public')); // Si usas carpeta public
-app.use(express.static(__dirname)); // Fallback por si los archivos están en la raíz
+// Corrección para servir archivos estáticos correctamente en Railway
+app.use(express.static(__dirname)); 
 app.use(express.json());
 
 // --- CACHÉ ---
@@ -46,14 +54,10 @@ let cachedEnvioId = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000;
 
-// --- FUNCIÓN HELPER: OBTENER COLUMNA S (ID ENVÍO) ---
+// --- HELPERS ---
 function getEnvioIdFromRow(row, keys) {
-    // Intento 1: Buscar por nombre exacto si existe
     if (row['ID ENVIO']) return row['ID ENVIO'];
     if (row['ENVIO ID']) return row['ENVIO ID'];
-    
-    // Intento 2: Buscar por posición (Columna S es la 19, índice 18)
-    // Aseguramos que el índice exista
     if (keys.length > 18) {
         return row[keys[18]]; 
     }
@@ -77,21 +81,15 @@ async function getSheetData() {
 
         let envioId = 'SIN_ID';
         if (parsed.data && parsed.data.length > 0) {
-            // Usamos la primera fila de datos para leer la celda S2 (que se repite en la columna)
-            // Ojo: En CSV exportado, la fila 1 es headers. parsed.data[0] es la fila 2 del Excel.
             const firstRow = parsed.data[0];
             const keys = Object.keys(firstRow);
-            
             envioId = getEnvioIdFromRow(firstRow, keys);
-            
-            // Limpieza básica del ID
             if(envioId) envioId = envioId.trim();
         }
 
         cachedData = parsed.data;
         cachedEnvioId = envioId;
         lastFetchTime = now;
-        console.log('Datos actualizados. ID Envio actual:', cachedEnvioId);
         return { data: cachedData, envioId: cachedEnvioId };
     } catch (error) {
         console.error('Error fetching Sheet:', error.message);
@@ -99,11 +97,8 @@ async function getSheetData() {
     }
 }
 
-// --- FUNCIONES DRIVE ---
 async function findOrCreateFolder(folderName, parentId) {
-    // Importante: Buscamos solo carpetas que no estén en la papelera
     let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
-    
     if (parentId) {
         query += ` and '${parentId}' in parents`;
     }
@@ -116,10 +111,8 @@ async function findOrCreateFolder(folderName, parentId) {
         });
 
         if (res.data.files.length > 0) {
-            console.log(`Carpeta encontrada: ${folderName} (${res.data.files[0].id})`);
             return res.data.files[0].id;
         } else {
-            console.log(`Creando carpeta: ${folderName} dentro de ${parentId || 'root'}`);
             const fileMetadata = {
                 name: folderName,
                 mimeType: 'application/vnd.google-apps.folder',
@@ -158,7 +151,6 @@ async function uploadFileToDrive(fileObject, parentFolderId) {
             media: media,
             fields: 'id',
         });
-        console.log('Archivo subido con ID:', file.data.id);
         return file.data.id;
     } catch (err) {
         console.error('Error Drive Upload:', err);
@@ -167,7 +159,6 @@ async function uploadFileToDrive(fileObject, parentFolderId) {
 }
 
 // --- ENDPOINTS ---
-
 app.get('/api/search', async (req, res) => {
     const query = req.query.q ? req.query.q.toLowerCase().trim() : '';
     if (!query) return res.json([]);
@@ -178,11 +169,9 @@ app.get('/api/search', async (req, res) => {
 
         const cleanResults = results.map(row => {
             const keys = Object.keys(row);
-            // Mapeo robusto
             const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
-            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D'; // Ajustar índice según tu hoja real si falla
+            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
             
-            // Agregados N(13) a Q(16). Ajusta índices si moviste columnas.
             const agregados = [];
             [13, 14, 15, 16].forEach(idx => {
                 if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
@@ -225,36 +214,22 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     const { itemId } = req.body;
     const file = req.file;
 
-    console.log(`Intentando subir foto para Item: ${itemId}`);
-
     if (!file || !itemId) return res.status(400).json({ error: 'Faltan datos' });
-    if (DRIVE_PARENT_FOLDER_ID === 'AQUI_PEGA_TU_ID_DE_CARPETA') {
-        return res.status(500).json({ error: 'Falta configurar el ID de la carpeta Drive en server.js' });
-    }
 
     try {
-        // 1. Obtener ID Envío
         const { envioId } = await getSheetData();
         const safeEnvioId = envioId ? envioId.replace(/[^a-zA-Z0-9-_]/g, '_') : 'SIN_ID';
         const safeItemId = itemId.replace(/[^a-zA-Z0-9-_]/g, '_');
 
-        console.log(`Estructura: [${DRIVE_PARENT_FOLDER_ID}] -> [${safeEnvioId}] -> [${safeItemId}]`);
-
-        // 2. Buscar/Crear carpeta ENVIO dentro de la carpeta MAESTRA
         const envioFolderId = await findOrCreateFolder(safeEnvioId, DRIVE_PARENT_FOLDER_ID);
-
-        // 3. Buscar/Crear carpeta ITEM dentro de carpeta ENVIO
         const itemFolderId = await findOrCreateFolder(safeItemId, envioFolderId);
-
-        // 4. Subir
         const fileId = await uploadFileToDrive(file, itemFolderId);
 
         res.json({ success: true, fileId });
 
     } catch (error) {
-        console.error('ERROR FINAL EN UPLOAD:', error);
-        // Devolvemos el error detallado al frontend para que lo veas en la alerta si falla
-        res.status(500).json({ error: error.message || 'Error interno al subir' });
+        console.error('ERROR UPLOAD:', error);
+        res.status(500).json({ error: error.message || 'Error al subir' });
     }
 });
 
