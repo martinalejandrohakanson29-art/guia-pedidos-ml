@@ -13,30 +13,35 @@ const PORT = process.env.PORT || 3000;
 // --- CONFIGURACIÓN ---
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1q0qWmIcRAybrxQcYRhJd5s-A1xiEe_VenWEA84Xptso/export?format=csv&gid=1839169689';
 
-// ID DE CARPETA DE DRIVE
+// ID DE CARPETA DE DRIVE (Tu carpeta compartida)
 const DRIVE_PARENT_FOLDER_ID = '1v-E638QF0AaPr7zywfH2luZvnHXtJujp';
 
-// --- CONFIGURACIÓN DRIVE (VARIABLES DE ENTORNO) ---
-const SCOPES = ['https://www.googleapis.com/auth/drive'];
+// --- NUEVA CONFIGURACIÓN DE AUTENTICACIÓN (OAUTH2) ---
+// Esto reemplaza al método antiguo del "Robot"
+let drive;
 
-let auth;
 try {
-    // Intenta leer la variable de entorno de Railway
-    if (process.env.GOOGLE_CREDENTIALS) {
-        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-        auth = new google.auth.GoogleAuth({
-            credentials: credentials,
-            scopes: SCOPES,
-        });
+    // Verificamos que las variables existan en Railway
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
+        
+        const oAuth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            "https://developers.google.com/oauthplayground" // URI de redirección usada para obtener el token
+        );
+
+        // Le damos el token maestro para que siempre tenga acceso
+        oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+
+        drive = google.drive({ version: 'v3', auth: oAuth2Client });
+        console.log('✅ Autenticación OAuth2 configurada correctamente.');
+        
     } else {
-        // Fallback para local si existe el archivo (opcional)
-        console.warn("Advertencia: No se detectó variable GOOGLE_CREDENTIALS.");
+        console.warn('⚠️ ADVERTENCIA: Faltan variables de entorno OAuth en Railway.');
     }
 } catch (error) {
-    console.error("ERROR CRÍTICO: La variable GOOGLE_CREDENTIALS no es un JSON válido.");
+    console.error("ERROR CRÍTICO CONFIGURANDO DRIVE:", error);
 }
-
-const drive = google.drive({ version: 'v3', auth });
 
 // --- CONFIGURACIÓN MULTER ---
 const upload = multer({
@@ -46,9 +51,7 @@ const upload = multer({
 
 app.use(cors());
 app.use(express.json());
-
-// --- SERVIR ARCHIVOS ESTÁTICOS ---
-// Esto busca archivos (css, js, html) en la raíz del proyecto
+// Servir archivos estáticos desde la raíz
 app.use(express.static(__dirname));
 
 // --- CACHÉ ---
@@ -101,8 +104,9 @@ async function getSheetData() {
 }
 
 async function findOrCreateFolder(folderName, parentId) {
-    if (!auth) throw new Error("No hay credenciales de Google configuradas.");
+    if (!drive) throw new Error("Google Drive no está configurado (faltan credenciales).");
     
+    // Buscamos carpeta que NO esté en la papelera
     let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
     if (parentId) {
         query += ` and '${parentId}' in parents`;
@@ -138,7 +142,7 @@ async function findOrCreateFolder(folderName, parentId) {
 }
 
 async function uploadFileToDrive(fileObject, parentFolderId) {
-    if (!auth) throw new Error("No hay credenciales de Google configuradas.");
+    if (!drive) throw new Error("Google Drive no está configurado.");
 
     const bufferStream = new stream.PassThrough();
     bufferStream.end(fileObject.buffer);
@@ -241,8 +245,7 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     }
 });
 
-// --- RUTA PRINCIPAL (SOLUCIÓN DEL ERROR) ---
-// Esto obliga al servidor a entregar el index.html cuando entras a la página
+// Ruta principal para servir el HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
