@@ -7,7 +7,6 @@
     <title>Buscador de Pedidos</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
@@ -41,15 +40,8 @@
 
         /* Animations */
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .animate-fade-in {
@@ -67,24 +59,17 @@
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 
 <body class="flex flex-col items-center justify-start pt-10 px-4 sm:px-6 lg:px-8 pb-20">
 
-    <!-- Header / Search Section -->
     <div class="w-full max-w-3xl mb-8 text-center">
         <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 tracking-tight">Guía de Pedidos</h1>
         
-        <!-- ID ENVÍO ACTUAL -->
         <div class="flex items-center justify-center gap-2 mb-6">
             <div class="glass px-4 py-2 rounded-full flex items-center gap-2">
                 <span class="text-sm text-gray-500 font-semibold uppercase tracking-wide">ID Envío Actual:</span>
@@ -115,11 +100,7 @@
         </div>
     </div>
 
-    <!-- Results Section -->
     <div id="resultsContainer" class="w-full max-w-3xl space-y-4 pb-10">
-        <!-- Resultados aquí -->
-
-        <!-- Estado inicial / Vacío -->
         <div id="emptyState" class="text-center py-12 hidden">
             <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -129,7 +110,6 @@
         </div>
     </div>
 
-    <!-- Botón Finalizar Envío (Fixed Bottom) -->
     <div class="fixed bottom-6 right-6 z-50">
         <button id="finalizeBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center gap-2">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +119,6 @@
         </button>
     </div>
 
-    <!-- Hidden File Input for Uploads -->
     <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
 
     <script>
@@ -153,7 +132,7 @@
         const finalizeBtn = document.getElementById('finalizeBtn');
 
         let debounceTimer;
-        let currentUploadItemId = null; // Para saber a qué item corresponde la foto seleccionada
+        let currentUploadItemId = null; 
 
         // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -227,7 +206,6 @@
             try {
                 const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
                 const data = await response.json();
-                
                 renderResults(data);
             } catch (error) {
                 console.error('Error buscando:', error);
@@ -236,7 +214,7 @@
             }
         }
 
-    function renderResults(results) {
+        function renderResults(results) {
             resultsContainer.innerHTML = '';
 
             if (results.length === 0) {
@@ -248,12 +226,18 @@
             emptyState.classList.add('hidden');
 
             results.forEach((item, index) => {
-                // Creamos un ID único para la imagen de esta tarjeta
-                const imgId = `img-${index}`;
-
                 const card = document.createElement('div');
-                card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 sm:gap-6 items-start'; // Ajusté padding y gap
+                card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 sm:gap-6 items-start';
                 card.style.animationDelay = `${index * 0.05}s`;
+
+                // --- Lógica de Imagen (Viene del Sheet) ---
+                const imagenSrc = item.image && item.image.startsWith('http') 
+                    ? item.image 
+                    : 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png';
+
+                const imgStyle = item.image && item.image.startsWith('http')
+                    ? 'object-cover' 
+                    : 'object-contain p-2 opacity-50';
 
                 // Colores para Envío
                 let envioColorClass = 'bg-gray-100 text-gray-600 border-gray-200';
@@ -280,14 +264,13 @@
                     `;
                 }
 
-                // --- ESTRUCTURA DE LA TARJETA ---
                 card.innerHTML = `
                     <div class="flex-shrink-0">
                         <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
-                            <img id="${imgId}" 
-                                 src="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png" 
+                            <img src="${imagenSrc}" 
                                  alt="Producto" 
-                                 class="w-full h-full object-contain p-2 opacity-50 transition-opacity duration-500">
+                                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
+                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
                         </div>
                     </div>
 
@@ -326,38 +309,7 @@
                 `;
 
                 resultsContainer.appendChild(card);
-
-                // --- LLAMADA A LA API DE ML ---
-                // Solo llamamos si el ID parece un MLA válido (ej: MLA123...)
-                if (item.title && item.title.toUpperCase().startsWith('MLA')) {
-                    fetchMLImage(item.title, imgId);
-                }
             });
-        }
-
-        // --- NUEVA FUNCIÓN PARA BUSCAR LA FOTO ---
-        async function fetchMLImage(mlId, imgElementId) {
-            const imgElement = document.getElementById(imgElementId);
-            if (!imgElement) return;
-
-            try {
-                // 1. Consultamos la API pública de items
-                const response = await fetch(`https://api.mercadolibre.com/items/${mlId}`);
-                
-                if (!response.ok) throw new Error('No encontrado en API');
-
-                const data = await response.json();
-
-                // 2. Buscamos la foto (thumbnail segura https)
-                if (data.secure_thumbnail) {
-                    imgElement.src = data.secure_thumbnail;
-                    imgElement.classList.remove('opacity-50', 'p-2'); // Quitamos estilo de placeholder
-                    imgElement.classList.add('object-cover'); // Ajustamos para que se vea bonita
-                }
-            } catch (error) {
-                // Si falla, dejamos la imagen por defecto
-                console.warn(`No se pudo cargar imagen para ${mlId}`);
-            }
         }
 
         // --- UPLOAD LOGIC ---
@@ -370,20 +322,16 @@
             if (e.target.files && e.target.files[0]) {
                 const file = e.target.files[0];
                 await uploadPhoto(file, currentUploadItemId);
-                // Reset input
                 fileInput.value = '';
             }
         });
 
         async function uploadPhoto(file, itemId) {
-            // Mostrar SweetAlert de carga
             Swal.fire({
                 title: 'Subiendo foto...',
                 html: 'Por favor espera',
                 allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
+                didOpen: () => { Swal.showLoading(); }
             });
 
             const formData = new FormData();
@@ -421,5 +369,3 @@
 </body>
 
 </html>
-
-
