@@ -234,7 +234,8 @@ app.post('/api/refresh', async (req, res) => {
 });
 
 app.post('/api/upload', upload.single('photo'), async (req, res) => {
-    const { itemId } = req.body;
+    // 1. Recibimos también el itemName
+    const { itemId, itemName } = req.body;
     const file = req.file;
 
     if (!file || !itemId) return res.status(400).json({ error: 'Faltan datos' });
@@ -242,10 +243,23 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     try {
         const { envioId } = await getSheetData();
         const safeEnvioId = envioId ? envioId.replace(/[^a-zA-Z0-9-_]/g, '_') : 'SIN_ID';
-        const safeItemId = itemId.replace(/[^a-zA-Z0-9-_]/g, '_');
+
+        // 2. Lógica para el nombre de la carpeta
+        let folderName = itemId;
+        
+        // Si nos llega un nombre, lo agregamos al formato "MLA... - Nombre"
+        if (itemName && itemName !== 'undefined' && itemName !== 'null' && itemName.trim() !== '') {
+            folderName = `${itemId} - ${itemName}`;
+        }
+
+        // 3. Saneamiento inteligente:
+        // Permitimos espacios, letras, números, tildes y guiones.
+        // Solo eliminamos caracteres que rompen rutas o sistemas de archivos (/ \ : * ? " < > |)
+        const safeFolderName = folderName.replace(/[/\\?%*:|"<>]/g, '').trim();
 
         const envioFolderId = await findOrCreateFolder(safeEnvioId, DRIVE_PARENT_FOLDER_ID);
-        const itemFolderId = await findOrCreateFolder(safeItemId, envioFolderId);
+        // Usamos el nuevo nombre combinado
+        const itemFolderId = await findOrCreateFolder(safeFolderName, envioFolderId);
         const fileId = await uploadFileToDrive(file, itemFolderId);
 
         res.json({ success: true, fileId });
@@ -264,5 +278,6 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Servidor listo en puerto ${PORT}`);
 });
+
 
 
