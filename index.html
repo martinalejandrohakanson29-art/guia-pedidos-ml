@@ -264,7 +264,8 @@
                     `;
                 }
 
-               const safeName = (item.publicationName || '').replace(/"/g, '&quot;');
+             // CORRECCIÓN (Usa el Titulo o el Nombre)
+const safeName = (item.subtitle || item.publicationName || '').replace(/"/g, '&quot;');
 
                 card.innerHTML = `
                     <div class="flex-shrink-0">
@@ -379,5 +380,6 @@
 </body>
 
 </html>
+
 
 
