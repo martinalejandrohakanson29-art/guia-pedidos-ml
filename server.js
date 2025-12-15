@@ -183,22 +183,26 @@ app.get('/api/search', async (req, res) => {
         const cleanResults = results.map(row => {
             const keys = Object.keys(row);
             
-            // Mapeo de columnas basado en índices (A=0, B=1, C=2)
-            const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';    // Columna A
-            const skuInventario = row['Nombre'] || row['Titulo'] || row[keys[1]] || ''; // Columna B (Antes usada como subtitle)
-            const nombrePublicacion = row[keys[2]] || ''; // Columna C -> NUEVO CAMPO
-            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D'; // Columna E (aprox)
+            // Mapeo de datos básicos
+            const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
+            const skuInventario = row['Nombre'] || row['Titulo'] || row[keys[1]] || ''; 
+            const nombrePublicacion = row[keys[2]] || ''; 
+            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
             
+            // --- NUEVO: LEER COLUMNA R (Índice 17) ---
+            // Leemos la columna por nombre "URLFOTO" o por posición (la número 18)
+            const fotoUrl = row['URLFOTO'] || row[keys[17]] || ''; 
+
             const agregados = [];
-            // Recolectamos notas extra de columnas posteriores
             [13, 14, 15, 16].forEach(idx => {
                 if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
             });
 
             return {
                 title: itemId,
-                subtitle: skuInventario, // Mantenemos la Columna B como dato secundario
-                publicationName: nombrePublicacion, // Enviamos la Columna C
+                subtitle: skuInventario,
+                publicationName: nombrePublicacion,
+                image: fotoUrl, // <--- Enviamos la foto al frontend
                 envio: envio,
                 agregados: agregados
             };
@@ -260,4 +264,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Servidor listo en puerto ${PORT}`);
 });
+
 
