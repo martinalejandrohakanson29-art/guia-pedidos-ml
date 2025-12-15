@@ -177,21 +177,28 @@ app.get('/api/search', async (req, res) => {
 
     try {
         const { data } = await getSheetData();
+        // Filtramos buscando en todos los valores de la fila
         const results = data.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query)));
 
         const cleanResults = results.map(row => {
             const keys = Object.keys(row);
-            const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
-            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
+            
+            // Mapeo de columnas basado en índices (A=0, B=1, C=2)
+            const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';    // Columna A
+            const skuInventario = row['Nombre'] || row['Titulo'] || row[keys[1]] || ''; // Columna B (Antes usada como subtitle)
+            const nombrePublicacion = row[keys[2]] || ''; // Columna C -> NUEVO CAMPO
+            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D'; // Columna E (aprox)
             
             const agregados = [];
+            // Recolectamos notas extra de columnas posteriores
             [13, 14, 15, 16].forEach(idx => {
                 if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
             });
 
             return {
                 title: itemId,
-                subtitle: row['Nombre'] || row['Titulo'] || row[keys[1]] || '',
+                subtitle: skuInventario, // Mantenemos la Columna B como dato secundario
+                publicationName: nombrePublicacion, // Enviamos la Columna C
                 envio: envio,
                 agregados: agregados
             };
@@ -253,3 +260,4 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Servidor listo en puerto ${PORT}`);
 });
+
