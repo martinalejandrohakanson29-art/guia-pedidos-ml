@@ -265,7 +265,8 @@
                 }
 
              // CORRECCIÓN (Usa el Titulo o el Nombre)
-const safeName = (item.subtitle || item.publicationName || '').replace(/"/g, '&quot;');
+// CORRECCIÓN: Priorizamos publicationName (Columna C)
+const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&quot;');
 
                 card.innerHTML = `
                     <div class="flex-shrink-0">
@@ -380,6 +381,7 @@ const safeName = (item.subtitle || item.publicationName || '').replace(/"/g, '&q
 </body>
 
 </html>
+
 
 
 
