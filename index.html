@@ -236,7 +236,7 @@
             }
         }
 
-       function renderResults(results) {
+    function renderResults(results) {
             resultsContainer.innerHTML = '';
 
             if (results.length === 0) {
@@ -248,8 +248,11 @@
             emptyState.classList.add('hidden');
 
             results.forEach((item, index) => {
+                // Creamos un ID único para la imagen de esta tarjeta
+                const imgId = `img-${index}`;
+
                 const card = document.createElement('div');
-                card.className = 'glass-card rounded-2xl p-6 animate-fade-in flex flex-col sm:flex-row justify-between items-start gap-6';
+                card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 sm:gap-6 items-start'; // Ajusté padding y gap
                 card.style.animationDelay = `${index * 0.05}s`;
 
                 // Colores para Envío
@@ -262,12 +265,11 @@
                 let agregadosHTML = '';
                 if (item.agregados && item.agregados.length > 0) {
                     agregadosHTML = `
-                        <div class="mt-4 bg-blue-50/50 rounded-xl p-4 border border-blue-100 w-full">
-                            <p class="text-xs text-blue-500 uppercase font-bold tracking-wider mb-2">Agregados / Notas</p>
-                            <ul class="space-y-2">
+                        <div class="mt-3 bg-blue-50/50 rounded-lg p-3 border border-blue-100 w-full">
+                            <ul class="space-y-1">
                                 ${item.agregados.map(agregado => `
-                                    <li class="flex items-start">
-                                        <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <li class="flex items-start text-sm">
+                                        <svg class="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                         </svg>
                                         <span class="text-gray-700 font-medium">${agregado}</span>
@@ -278,19 +280,29 @@
                     `;
                 }
 
+                // --- ESTRUCTURA DE LA TARJETA ---
                 card.innerHTML = `
-                    <div class="flex-1 w-full">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <h2 class="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                    <div class="flex-shrink-0">
+                        <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
+                            <img id="${imgId}" 
+                                 src="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png" 
+                                 alt="Producto" 
+                                 class="w-full h-full object-contain p-2 opacity-50 transition-opacity duration-500">
+                        </div>
+                    </div>
+
+                    <div class="flex-1 w-full min-w-0">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+                            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
                                 ${item.title}
                             </h2>
 
                             <div class="flex items-center gap-2">
-                                <span class="px-4 py-2 rounded-lg text-sm font-bold border ${envioColorClass} shadow-sm">
+                                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
                                     ${item.envio}
                                 </span>
                                 <button onclick="triggerUpload('${item.title}')" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" title="Subir Foto">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     </svg>
@@ -298,14 +310,14 @@
                             </div>
                         </div>
                         
-                        <div class="mb-2">
-                            <p class="text-lg text-gray-800 font-semibold leading-snug">
-                                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre de publicación</span>'}
+                        <div class="mb-1">
+                             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
+                                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
                             </p>
                         </div>
 
-                        <p class="text-sm text-gray-500 font-medium flex items-center gap-1">
-                           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU/Inv:</span> 
+                        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
+                           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
                            ${item.subtitle}
                         </p>
                         
@@ -314,7 +326,38 @@
                 `;
 
                 resultsContainer.appendChild(card);
+
+                // --- LLAMADA A LA API DE ML ---
+                // Solo llamamos si el ID parece un MLA válido (ej: MLA123...)
+                if (item.title && item.title.toUpperCase().startsWith('MLA')) {
+                    fetchMLImage(item.title, imgId);
+                }
             });
+        }
+
+        // --- NUEVA FUNCIÓN PARA BUSCAR LA FOTO ---
+        async function fetchMLImage(mlId, imgElementId) {
+            const imgElement = document.getElementById(imgElementId);
+            if (!imgElement) return;
+
+            try {
+                // 1. Consultamos la API pública de items
+                const response = await fetch(`https://api.mercadolibre.com/items/${mlId}`);
+                
+                if (!response.ok) throw new Error('No encontrado en API');
+
+                const data = await response.json();
+
+                // 2. Buscamos la foto (thumbnail segura https)
+                if (data.secure_thumbnail) {
+                    imgElement.src = data.secure_thumbnail;
+                    imgElement.classList.remove('opacity-50', 'p-2'); // Quitamos estilo de placeholder
+                    imgElement.classList.add('object-cover'); // Ajustamos para que se vea bonita
+                }
+            } catch (error) {
+                // Si falla, dejamos la imagen por defecto
+                console.warn(`No se pudo cargar imagen para ${mlId}`);
+            }
         }
 
         // --- UPLOAD LOGIC ---
@@ -378,4 +421,5 @@
 </body>
 
 </html>
+
 
