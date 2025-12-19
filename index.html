@@ -269,52 +269,58 @@
 const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&quot;');
 
                 card.innerHTML = `
-                    <div class="flex-shrink-0">
-                        <div class="w-32 h-32 sm:w-48 sm:h-48 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
-                            <img src="${imagenSrc}" 
-                                 alt="Producto" 
-                                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
-                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
-                        </div>
-                    </div>
+    <div class="flex-shrink-0">
+        <div class="w-32 h-32 sm:w-48 sm:h-48 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
+            <img src="${imagenSrc}" 
+                 alt="Producto" 
+                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
+                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
+        </div>
+    </div>
 
-                    <div class="flex-1 w-full min-w-0">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-                            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
-                                ${item.title}
-                            </h2>
+    <div class="flex-1 w-full min-w-0">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
+                ${item.title}
+            </h2>
 
-                            <div class="flex items-center gap-2">
-                                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
-                                    ${item.envio}
-                                </span>
-                                
-                                <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
-                                        data-name="${safeName}"
-                                        class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
-                                        title="Subir Foto">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-1">
-                             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
-                                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
-                            </p>
-                        </div>
+            <div class="flex items-center gap-2">
+                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
+                    ${item.envio}
+                </span>
+                
+                <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
+                        data-name="${safeName}"
+                        class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
+                        title="Subir Foto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="mb-1">
+             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
+                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
+            </p>
+        </div>
 
-                        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
-                           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
-                           ${item.subtitle}
-                        </p>
-                        
-                        ${agregadosHTML}
-                    </div>
-                `;
+        ${item.variation ? `
+            <div class="mb-2 inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
+                Variación: ${item.variation}
+            </div>
+        ` : ''}
+
+        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
+           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
+           ${item.subtitle}
+        </p>
+        
+        ${agregadosHTML}
+    </div>
+`;
 
                 resultsContainer.appendChild(card);
             });
@@ -381,6 +387,7 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
 </body>
 
 </html>
+
 
 
 
