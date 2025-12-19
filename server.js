@@ -180,33 +180,37 @@ app.get('/api/search', async (req, res) => {
         // Filtramos buscando en todos los valores de la fila
         const results = data.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query)));
 
-        const cleanResults = results.map(row => {
-            const keys = Object.keys(row);
-            
-            // Mapeo de datos básicos
-            const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
-            const skuInventario = row['Nombre'] || row['Titulo'] || row[keys[1]] || ''; 
-            const nombrePublicacion = row[keys[2]] || ''; 
-            const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
-            
-            // --- NUEVO: LEER COLUMNA R (Índice 17) ---
-            // Leemos la columna por nombre "URLFOTO" o por posición (la número 18)
-            const fotoUrl = row['URLFOTO'] || row[keys[17]] || ''; 
+       // En server.js, dentro de app.get('/api/search'...)
 
-            const agregados = [];
-            [13, 14, 15, 16].forEach(idx => {
-                if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
-            });
+const cleanResults = results.map(row => {
+    const keys = Object.keys(row);
+    
+    // Mapeo de datos básicos
+    const itemId = row['ITEM ID'] || row[keys[0]] || 'S/D';
+    const skuInventario = row['Nombre'] || row['Titulo'] || row[keys[1]] || ''; 
+    const nombrePublicacion = row[keys[2]] || ''; 
+    
+    // --- NUEVO: LEER COLUMNA D (Índice 3) "VARIATION LABEL" ---
+    const variacion = row['VARIATION LABEL'] || row[keys[3]] || ''; 
 
-            return {
-                title: itemId,
-                subtitle: skuInventario,
-                publicationName: nombrePublicacion,
-                image: fotoUrl, // <--- Enviamos la foto al frontend
-                envio: envio,
-                agregados: agregados
-            };
-        });
+    const envio = row['Envío'] || row['Envio'] || row[keys[4]] || 'S/D';
+    const fotoUrl = row['URLFOTO'] || row[keys[17]] || ''; 
+
+    const agregados = [];
+    [13, 14, 15, 16].forEach(idx => {
+        if(keys[idx] && row[keys[idx]]) agregados.push(row[keys[idx]]);
+    });
+
+    return {
+        title: itemId,
+        subtitle: skuInventario,
+        publicationName: nombrePublicacion,
+        variation: variacion, // <--- Agregamos este campo al objeto
+        image: fotoUrl,
+        envio: envio,
+        agregados: agregados
+    };
+});
         res.json(cleanResults);
     } catch (error) {
         console.error(error);
@@ -278,6 +282,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Servidor listo en puerto ${PORT}`);
 });
+
 
 
 
