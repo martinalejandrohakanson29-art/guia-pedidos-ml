@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buscador de Pedidos</title>
+    <title>Buscador de Pedidos - Revolución Motos</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -71,11 +71,13 @@
         <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 tracking-tight">Guía de Pedidos</h1>
         
         <div class="flex items-center justify-center gap-2 mb-6">
-            <div class="glass px-4 py-2 rounded-full flex items-center gap-2">
-                <span class="text-sm text-gray-500 font-semibold uppercase tracking-wide">ID Envío Actual:</span>
-                <span id="envioIdDisplay" class="text-lg font-bold text-blue-600">Cargando...</span>
+            <div class="glass px-4 py-2 rounded-2xl flex items-center gap-2">
+                <span class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Envío Destino:</span>
+                <select id="envioIdSelect" class="bg-transparent text-lg font-bold text-blue-600 focus:outline-none cursor-pointer outline-none border-none">
+                    <option disabled selected>Cargando...</option>
+                </select>
             </div>
-            <button id="refreshBtn" class="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors text-gray-600 hover:text-blue-600" title="Recargar ID desde Sheet">
+            <button id="refreshBtn" class="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors text-gray-600 hover:text-blue-600" title="Actualizar lista de envíos">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
@@ -126,7 +128,7 @@
         const resultsContainer = document.getElementById('resultsContainer');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const emptyState = document.getElementById('emptyState');
-        const envioIdDisplay = document.getElementById('envioIdDisplay');
+        const envioIdSelect = document.getElementById('envioIdSelect'); // MODIFICADO
         const refreshBtn = document.getElementById('refreshBtn');
         const fileInput = document.getElementById('fileInput');
         const finalizeBtn = document.getElementById('finalizeBtn');
@@ -134,38 +136,51 @@
         let debounceTimer;
         let currentUploadItemId = null; 
         let currentUploadItemName = null;
+
         // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
             fetchEnvioId();
         });
 
-        // --- LÓGICA DE ENVÍO ID ---
+        // --- LÓGICA DE ENVÍO ID (MODIFICADA PARA DB) ---
         async function fetchEnvioId() {
             try {
                 const response = await fetch('/api/envio-id');
                 const data = await response.json();
-                envioIdDisplay.textContent = data.envioId || 'NO DEFINIDO';
+                
+                envioIdSelect.innerHTML = ''; // Limpiar opciones
+
+                if (data.shipments && data.shipments.length > 0) {
+                    data.shipments.forEach(id => {
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = id;
+                        envioIdSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.textContent = 'Sin envíos activos';
+                    envioIdSelect.appendChild(option);
+                }
             } catch (error) {
-                console.error('Error fetching Envio ID:', error);
-                envioIdDisplay.textContent = 'Error';
+                console.error('Error fetching Envio IDs:', error);
+                envioIdSelect.innerHTML = '<option>Error de conexión</option>';
             }
         }
 
         refreshBtn.addEventListener('click', async () => {
             refreshBtn.classList.add('animate-spin');
             try {
-                const response = await fetch('/api/refresh', { method: 'POST' });
-                const data = await response.json();
-                if (data.success) {
-                    envioIdDisplay.textContent = data.envioId;
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Actualizado',
-                        text: 'Datos recargados correctamente',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
-                }
+                // Forzamos actualización de IDs consultando la DB y refrescando productos
+                await fetch('/api/refresh', { method: 'POST' });
+                await fetchEnvioId();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Lista Actualizada',
+                    text: 'Se cargaron los envíos más recientes.',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
             } catch (error) {
                 Swal.fire('Error', 'No se pudo actualizar', 'error');
             } finally {
@@ -174,9 +189,10 @@
         });
 
         finalizeBtn.addEventListener('click', () => {
+            const envioActual = envioIdSelect.value;
             Swal.fire({
-                title: '¡Envío Finalizado!',
-                text: 'Por favor ve al Sheet y cambia el ID en la celda S2 para el próximo lote.',
+                title: '¡Proceso Terminado!',
+                text: `Has terminado la preparación del lote para: ${envioActual}`,
                 icon: 'success',
                 confirmButtonText: 'Entendido',
                 confirmButtonColor: '#3b82f6'
@@ -186,17 +202,13 @@
         // --- BÚSQUEDA ---
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
-            
             clearTimeout(debounceTimer);
-            
             if (query.length < 2) {
                 resultsContainer.innerHTML = '';
                 emptyState.classList.add('hidden');
                 return;
             }
-
             loadingSpinner.classList.remove('hidden');
-            
             debounceTimer = setTimeout(() => {
                 fetchResults(query);
             }, 300);
@@ -216,13 +228,11 @@
 
         function renderResults(results) {
             resultsContainer.innerHTML = '';
-
             if (results.length === 0) {
                 emptyState.classList.remove('hidden');
                 resultsContainer.appendChild(emptyState);
                 return;
             }
-
             emptyState.classList.add('hidden');
 
             results.forEach((item, index) => {
@@ -230,7 +240,6 @@
                 card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 sm:gap-6 items-start';
                 card.style.animationDelay = `${index * 0.05}s`;
 
-                // --- Lógica de Imagen (Viene del Sheet) ---
                 const imagenSrc = item.image && item.image.startsWith('http') 
                     ? item.image 
                     : 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png';
@@ -239,13 +248,11 @@
                     ? 'object-cover' 
                     : 'object-contain p-2 opacity-50';
 
-                // Colores para Envío
                 let envioColorClass = 'bg-gray-100 text-gray-600 border-gray-200';
                 if (item.envio.toLowerCase().includes('full')) envioColorClass = 'bg-green-50 text-green-700 border-green-200';
                 if (item.envio.toLowerCase().includes('flex')) envioColorClass = 'bg-yellow-50 text-yellow-700 border-yellow-200';
                 if (item.envio.toLowerCase().includes('colecta')) envioColorClass = 'bg-blue-50 text-blue-700 border-blue-200';
 
-                // Renderizar Agregados
                 let agregadosHTML = '';
                 if (item.agregados && item.agregados.length > 0) {
                     agregadosHTML = `
@@ -264,72 +271,62 @@
                     `;
                 }
 
-             // CORRECCIÓN (Usa el Titulo o el Nombre)
-// CORRECCIÓN: Priorizamos publicationName (Columna C)
-const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&quot;');
+                const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&quot;');
 
                 card.innerHTML = `
-    <div class="flex-shrink-0">
-        <div class="w-32 h-32 sm:w-48 sm:h-48 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
-            <img src="${imagenSrc}" 
-                 alt="Producto" 
-                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
-                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
-        </div>
-    </div>
+                    <div class="flex-shrink-0">
+                        <div class="w-32 h-32 sm:w-48 sm:h-48 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
+                            <img src="${imagenSrc}" 
+                                 alt="Producto" 
+                                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
+                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
+                        </div>
+                    </div>
 
-    <div class="flex-1 w-full min-w-0">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
-                ${item.title}
-            </h2>
-
-            <div class="flex items-center gap-2">
-                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
-                    ${item.envio}
-                </span>
-                
-                <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
-                        data-name="${safeName}"
-                        class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
-                        title="Subir Foto">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        
-        <div class="mb-1">
-             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
-                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
-            </p>
-        </div>
-
-        ${item.variation ? `
-            <div class="mb-2 inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
-                Variación: ${item.variation}
-            </div>
-        ` : ''}
-
-        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
-           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
-           ${item.subtitle}
-        </p>
-        
-        ${agregadosHTML}
-    </div>
-`;
-
+                    <div class="flex-1 w-full min-w-0">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+                            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
+                                ${item.title}
+                            </h2>
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
+                                    ${item.envio}
+                                </span>
+                                <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
+                                        data-name="${safeName}"
+                                        class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
+                                        title="Subir Foto">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-1">
+                             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
+                                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
+                            </p>
+                        </div>
+                        ${item.variation ? `
+                            <div class="mb-2 inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
+                                Variación: ${item.variation}
+                            </div>
+                        ` : ''}
+                        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
+                           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
+                           ${item.subtitle}
+                        </p>
+                        ${agregadosHTML}
+                    </div>
+                `;
                 resultsContainer.appendChild(card);
             });
         }
 
-       // Modificamos triggerUpload para recibir el nombre
         window.triggerUpload = (itemId, itemName) => {
             currentUploadItemId = itemId;
-            currentUploadItemName = itemName || ''; // Guardamos el nombre
+            currentUploadItemName = itemName || ''; 
             fileInput.click();
         };
 
@@ -341,10 +338,13 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
             }
         });
 
+        // --- SUBIDA DE FOTO MODIFICADA: Ahora usa el Envío seleccionado ---
         async function uploadPhoto(file, itemId) {
+            const selectedEnvioId = envioIdSelect.value; // MODIFICADO
+
             Swal.fire({
                 title: 'Subiendo foto...',
-                html: 'Por favor espera',
+                html: `Destino: <b>${selectedEnvioId}</b><br>Por favor espera.`,
                 allowOutsideClick: false,
                 didOpen: () => { Swal.showLoading(); }
             });
@@ -352,11 +352,10 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
             const formData = new FormData();
             formData.append('photo', file);
             formData.append('itemId', itemId);
-            // Agregamos el nombre guardado al envío
-            formData.append('itemName', currentUploadItemName); 
+            formData.append('itemName', currentUploadItemName);
+            formData.append('envioId', selectedEnvioId); // MODIFICADO
 
             try {
-                // ... (el resto de la función sigue igual)
                 const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
@@ -367,7 +366,7 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
                     Swal.fire({
                         icon: 'success',
                         title: '¡Foto subida!',
-                        text: 'La imagen se guardó correctamente en Drive.',
+                        text: `La imagen se guardó en la carpeta del envío: ${selectedEnvioId}`,
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -379,7 +378,7 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'No se pudo subir la foto. Revisa la consola o intenta de nuevo.'
+                    text: 'No se pudo subir la foto. Intenta de nuevo.'
                 });
             }
         }
@@ -387,6 +386,7 @@ const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&q
 </body>
 
 </html>
+
 
 
 
