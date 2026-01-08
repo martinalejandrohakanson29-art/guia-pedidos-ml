@@ -58,7 +58,6 @@ async function getRecentShipments() {
 
 // --- 4. ENDPOINTS API ---
 
-// Lista de envíos para el dropdown (Enviamos ID y Nombre)
 app.get('/api/envio-id', async (req, res) => {
     try {
         const shipments = await getRecentShipments();
@@ -68,34 +67,27 @@ app.get('/api/envio-id', async (req, res) => {
     }
 });
 
-// BÚSQUEDA: Ahora consulta la tabla ShipmentItem filtrando por shipmentId
 app.get('/api/search', async (req, res) => {
     const { q, shipmentId } = req.query;
-    
     if (!shipmentId) return res.status(400).json({ error: 'Falta el ID del envío' });
 
     try {
-        // Buscamos coincidencias en SKU, Título o ItemId (MLA)
         const query = `
             SELECT * FROM "ShipmentItem" 
             WHERE "shipmentId" = $1 
-            AND (
-                "itemId" ILIKE $2 OR 
-                "title" ILIKE $2 OR 
-                "sku" ILIKE $2
-            )
+            AND ("itemId" ILIKE $2 OR "title" ILIKE $2 OR "sku" ILIKE $2)
             LIMIT 50
         `;
         const values = [shipmentId, `%${q}%`];
         const result = await pool.query(query, values);
         
-        // Mapeamos los datos para el frontend
         const formattedResults = result.rows.map(row => ({
             title: row.itemId, 
             subtitle: row.sku,
             publicationName: row.title,
             variation: row.variation,
             image: row.imageUrl,
+            quantity: row.quantity, // <--- AGREGADO: Se incluye la cantidad de la DB
             envio: 'Cargado desde DB',
             agregados: row.agregados ? [row.agregados] : [] 
         }));
@@ -107,44 +99,35 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// Subida de fotos a Drive
 app.post('/api/upload', upload.single('photo'), async (req, res) => {
     const { itemId, itemName, envioId } = req.body;
     const file = req.file;
-
     if (!file || !itemId || !envioId) return res.status(400).json({ error: 'Faltan datos' });
 
     try {
-        // Obtenemos el nombre real del envío para crear la carpeta
         const shipRes = await pool.query('SELECT name FROM "Shipment" WHERE id = $1', [envioId]);
         const envioName = shipRes.rows.length > 0 ? shipRes.rows[0].name : envioId;
-
         const safeEnvioId = envioName.toString().replace(/[^a-zA-Z0-9-_]/g, '_');
         let folderName = itemId;
         if (itemName && itemName !== 'undefined' && itemName.trim() !== '') {
             folderName = `${itemId} - ${itemName}`;
         }
         const safeFolderName = folderName.replace(/[/\\?%*:|"<>]/g, '').trim();
-
         const envioFolderId = await findOrCreateFolder(safeEnvioId, DRIVE_PARENT_FOLDER_ID);
         const itemFolderId = await findOrCreateFolder(safeFolderName, envioFolderId);
         await uploadFileToDrive(file, itemFolderId);
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// --- 5. FUNCIONES DRIVE ---
 async function findOrCreateFolder(folderName, parentId) {
     if (!drive) throw new Error("Google Drive no configurado.");
     let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
     if (parentId) query += ` and '${parentId}' in parents`;
-
     const res = await drive.files.list({ q: query, fields: 'files(id, name)' });
     if (res.data.files.length > 0) return res.data.files[0].id;
-
     const file = await drive.files.create({
         resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : [] },
         fields: 'id',
@@ -164,5 +147,4 @@ async function uploadFileToDrive(fileObject, parentFolderId) {
 }
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
 app.listen(PORT, () => console.log(`🚀 Servidor listo en puerto ${PORT}`));
