@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,115 +8,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .glass-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 3px solid #3b82f6;
-            width: 24px;
-            height: 24px;
-            -webkit-animation: spin 1s linear infinite;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07); }
+        .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); transition: transform 0.2s ease; }
+        .glass-card:hover { transform: translateY(-2px); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #3b82f6; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-
-<body class="flex flex-col items-center justify-start pt-10 px-4 sm:px-6 lg:px-8 pb-20">
+<body class="flex flex-col items-center justify-start pt-10 px-4 pb-20">
 
     <div class="w-full max-w-3xl mb-8 text-center">
-        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 tracking-tight">Guía de Pedidos</h1>
-        
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Guía de Pedidos</h1>
         <div class="flex items-center justify-center gap-2 mb-6">
             <div class="glass px-4 py-2 rounded-2xl flex items-center gap-2">
-                <span class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Envío Destino:</span>
-                <select id="envioIdSelect" class="bg-transparent text-lg font-bold text-blue-600 focus:outline-none cursor-pointer outline-none border-none">
-                    <option disabled selected>Cargando...</option>
-                </select>
+                <span class="text-sm text-gray-500 font-semibold uppercase">Envío:</span>
+                <select id="envioIdSelect" class="bg-transparent text-lg font-bold text-blue-600 focus:outline-none cursor-pointer"></select>
             </div>
-            <button id="refreshBtn" class="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors text-gray-600 hover:text-blue-600" title="Actualizar lista de envíos">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
+            <button id="refreshBtn" class="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
         </div>
-
-        <p class="text-gray-500 mb-8">Busca por Item ID (MLA), SKU o Nombre en el envío seleccionado</p>
-
         <div class="relative w-full">
-            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-            </div>
-            <input type="text" id="searchInput"
-                class="glass w-full pl-12 pr-4 py-4 rounded-2xl text-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                placeholder="Escribe para buscar..." autofocus>
-            <div id="loadingSpinner" class="absolute inset-y-0 right-0 pr-4 flex items-center hidden">
-                <div class="loader"></div>
-            </div>
+            <input type="text" id="searchInput" class="glass w-full pl-12 pr-4 py-4 rounded-2xl text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="MLA, SKU o Nombre..." autofocus>
+            <div id="loadingSpinner" class="absolute inset-y-0 right-0 pr-4 flex items-center hidden"><div class="loader"></div></div>
         </div>
     </div>
 
-    <div id="resultsContainer" class="w-full max-w-3xl space-y-4 pb-10">
-        <div id="emptyState" class="text-center py-12 hidden">
-            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-500">No se encontraron resultados en este envío</h3>
-        </div>
-    </div>
-
-    <div class="fixed bottom-6 right-6 z-50">
-        <button id="finalizeBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center gap-2">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            Finalizar Envío
-        </button>
-    </div>
+    <div id="resultsContainer" class="w-full max-w-3xl space-y-4"></div>
 
     <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
 
@@ -125,192 +45,65 @@
         const searchInput = document.getElementById('searchInput');
         const resultsContainer = document.getElementById('resultsContainer');
         const loadingSpinner = document.getElementById('loadingSpinner');
-        const emptyState = document.getElementById('emptyState');
         const envioIdSelect = document.getElementById('envioIdSelect');
-        const refreshBtn = document.getElementById('refreshBtn');
         const fileInput = document.getElementById('fileInput');
-        const finalizeBtn = document.getElementById('finalizeBtn');
+        let debounceTimer, currentUploadItemId, currentUploadItemName;
 
-        let debounceTimer;
-        let currentUploadItemId = null; 
-        let currentUploadItemName = null;
+        document.addEventListener('DOMContentLoaded', fetchEnvioId);
 
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchEnvioId();
-        });
-
-        // Obtiene la lista de envíos (ahora procesa objetos id/name)
         async function fetchEnvioId() {
             try {
-                const response = await fetch('/api/envio-id');
-                const data = await response.json();
-                
-                envioIdSelect.innerHTML = '';
-
-                if (data.shipments && data.shipments.length > 0) {
-                    data.shipments.forEach(shipment => {
-                        const option = document.createElement('option');
-                        option.value = shipment.id; // El ID de la tabla Shipment
-                        option.textContent = shipment.name; // El número de envío visible
-                        envioIdSelect.appendChild(option);
-                    });
-                } else {
-                    const option = document.createElement('option');
-                    option.textContent = 'Sin envíos activos';
-                    envioIdSelect.appendChild(option);
-                }
-            } catch (error) {
-                console.error('Error fetching Envio IDs:', error);
-                envioIdSelect.innerHTML = '<option>Error de conexión</option>';
-            }
+                const res = await fetch('/api/envio-id');
+                const data = await res.json();
+                envioIdSelect.innerHTML = data.shipments.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            } catch (error) { console.error(error); }
         }
-
-        refreshBtn.addEventListener('click', async () => {
-            refreshBtn.classList.add('animate-spin');
-            try {
-                await fetchEnvioId();
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Lista Actualizada',
-                    text: 'Se cargaron los envíos más recientes de la base de datos.',
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-            } catch (error) {
-                Swal.fire('Error', 'No se pudo actualizar', 'error');
-            } finally {
-                refreshBtn.classList.remove('animate-spin');
-            }
-        });
-
-        finalizeBtn.addEventListener('click', () => {
-            const envioActualNombre = envioIdSelect.options[envioIdSelect.selectedIndex].text;
-            Swal.fire({
-                title: '¡Proceso Terminado!',
-                text: `Has terminado la preparación del envío: ${envioActualNombre}`,
-                icon: 'success',
-                confirmButtonText: 'Entendido',
-                confirmButtonColor: '#3b82f6'
-            });
-        });
 
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
             clearTimeout(debounceTimer);
-            if (query.length < 2) {
-                resultsContainer.innerHTML = '';
-                emptyState.classList.add('hidden');
-                return;
-            }
+            if (query.length < 2) { resultsContainer.innerHTML = ''; return; }
             loadingSpinner.classList.remove('hidden');
-            debounceTimer = setTimeout(() => {
-                fetchResults(query);
-            }, 300);
+            debounceTimer = setTimeout(() => fetchResults(query), 300);
         });
 
-        // BÚSQUEDA: Envía el q y el shipmentId seleccionado
         async function fetchResults(query) {
             const shipmentId = envioIdSelect.value;
-            if (!shipmentId || shipmentId === 'Cargando...') {
-                loadingSpinner.classList.add('hidden');
-                return;
-            }
-
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&shipmentId=${shipmentId}`);
-                const data = await response.json();
+                const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&shipmentId=${shipmentId}`);
+                const data = await res.json();
                 renderResults(data);
-            } catch (error) {
-                console.error('Error buscando:', error);
-            } finally {
-                loadingSpinner.classList.add('hidden');
-            }
+            } finally { loadingSpinner.classList.add('hidden'); }
         }
 
         function renderResults(results) {
-            resultsContainer.innerHTML = '';
-            if (results.length === 0) {
-                emptyState.classList.remove('hidden');
-                resultsContainer.appendChild(emptyState);
-                return;
-            }
-            emptyState.classList.add('hidden');
-
+            resultsContainer.innerHTML = results.length ? '' : '<p class="text-center text-gray-500 py-10">Sin resultados</p>';
             results.forEach((item, index) => {
                 const card = document.createElement('div');
-                card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 sm:gap-6 items-start';
+                card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 items-start';
                 card.style.animationDelay = `${index * 0.05}s`;
 
-                const imagenSrc = item.image && item.image.startsWith('http') 
-                    ? item.image 
-                    : 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png';
-
-                const imgStyle = item.image && item.image.startsWith('http')
-                    ? 'object-cover' 
-                    : 'object-contain p-2 opacity-50';
-
-                let agregadosHTML = '';
-                if (item.agregados && item.agregados.length > 0) {
-                    agregadosHTML = `
-                        <div class="mt-3 bg-blue-50/50 rounded-lg p-3 border border-blue-100 w-full">
-                            <ul class="space-y-1">
-                                ${item.agregados.map(agregado => `
-                                    <li class="flex items-start text-sm">
-                                        <svg class="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        <span class="text-gray-700 font-medium">${agregado}</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-
-                const safeName = (item.publicationName || '').replace(/"/g, '&quot;');
-
                 card.innerHTML = `
-                    <div class="flex-shrink-0">
-                        <div class="w-32 h-32 sm:w-48 sm:h-48 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative shadow-sm">
-                            <img src="${imagenSrc}" 
-                                 alt="Producto" 
-                                 class="w-full h-full ${imgStyle} transition-opacity duration-500"
-                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png';">
+                    <div class="flex-shrink-0 relative">
+                        <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-xl bg-gray-100 border overflow-hidden">
+                            <img src="${item.image || 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'}" 
+                                 class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-xl font-bold w-10 h-10 flex items-center justify-center rounded-full shadow-lg border-2 border-white">
+                            ${item.quantity || 1}
                         </div>
                     </div>
-
                     <div class="flex-1 w-full min-w-0">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-                            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
-                                ${item.title}
-                            </h2>
-                            <div class="flex items-center gap-2">
-                                <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
-                                        data-name="${safeName}"
-                                        class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
-                                        title="Subir Foto">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                </button>
-                            </div>
+                        <div class="flex justify-between items-start gap-2">
+                            <h2 class="text-xl font-bold text-gray-900 truncate">${item.title}</h2>
+                            <button onclick="triggerUpload('${item.title}', '${(item.publicationName || '').replace(/'/g, "\\'")}')" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                            </button>
                         </div>
-                        <div class="mb-1">
-                             <p class="text-base sm:text-lg text-gray-800 font-semibold leading-snug break-words">
-                                ${item.publicationName || '<span class="text-gray-400 italic">Sin nombre</span>'}
-                            </p>
-                        </div>
-                        ${item.variation ? `
-                            <div class="mb-2 inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
-                                Variación: ${item.variation}
-                            </div>
-                        ` : ''}
-                        <p class="text-sm text-gray-500 font-medium flex items-center gap-1 mb-2">
-                           <span class="uppercase text-xs font-bold tracking-wide text-gray-400">SKU:</span> 
-                           ${item.subtitle}
-                        </p>
-                        ${agregadosHTML}
+                        <p class="text-gray-800 font-semibold text-base mb-1">${item.publicationName || 'Sin nombre'}</p>
+                        ${item.variation ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-md font-bold mb-2 inline-block">Var: ${item.variation}</span>` : ''}
+                        <p class="text-xs text-gray-500 font-bold uppercase">SKU: ${item.subtitle}</p>
+                        ${item.agregados.length ? `<div class="mt-2 p-2 bg-blue-50 rounded-lg text-sm text-blue-800"><b>Agregados:</b> ${item.agregados.join(', ')}</div>` : ''}
                     </div>
                 `;
                 resultsContainer.appendChild(card);
@@ -319,63 +112,25 @@
 
         window.triggerUpload = (itemId, itemName) => {
             currentUploadItemId = itemId;
-            currentUploadItemName = itemName || ''; 
+            currentUploadItemName = itemName;
             fileInput.click();
         };
 
         fileInput.addEventListener('change', async (e) => {
-            if (e.target.files && e.target.files[0]) {
-                const file = e.target.files[0];
-                await uploadPhoto(file, currentUploadItemId);
-                fileInput.value = '';
-            }
-        });
-
-        async function uploadPhoto(file, itemId) {
+            if (!e.target.files[0]) return;
             const selectedEnvioId = envioIdSelect.value;
-            const selectedEnvioNombre = envioIdSelect.options[envioIdSelect.selectedIndex].text;
-
-            Swal.fire({
-                title: 'Subiendo foto...',
-                html: `Envío: <b>${selectedEnvioNombre}</b><br>Por favor espera.`,
-                allowOutsideClick: false,
-                didOpen: () => { Swal.showLoading(); }
-            });
-
+            Swal.fire({ title: 'Subiendo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             const formData = new FormData();
-            formData.append('photo', file);
-            formData.append('itemId', itemId);
+            formData.append('photo', e.target.files[0]);
+            formData.append('itemId', currentUploadItemId);
             formData.append('itemName', currentUploadItemName);
             formData.append('envioId', selectedEnvioId);
-
             try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Foto subida!',
-                        text: `Imagen guardada en la carpeta del envío: ${selectedEnvioNombre}`,
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                } else {
-                    throw new Error(result.error || 'Error desconocido');
-                }
-            } catch (error) {
-                console.error('Error subiendo:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'No se pudo subir la foto. Intenta de nuevo.'
-                });
-            }
-        }
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.success) Swal.fire({ icon: 'success', title: '¡Subida con éxito!', timer: 1500, showConfirmButton: false });
+            } catch (error) { Swal.fire('Error', 'No se pudo subir la foto', 'error'); }
+        });
     </script>
 </body>
-
 </html>
