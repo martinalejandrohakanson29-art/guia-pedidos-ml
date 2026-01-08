@@ -83,6 +83,29 @@
                 card.className = 'glass-card rounded-2xl p-4 animate-fade-in flex flex-col sm:flex-row gap-4 items-start';
                 card.style.animationDelay = `${index * 0.05}s`;
 
+                // --- LÓGICA PARA AGREGADOS EN LISTA ---
+                let agregadosHTML = '';
+                if (item.agregados && item.agregados.length > 0 && item.agregados[0]) {
+                    // Si el texto tiene comas, lo separamos en una lista real
+                    const lista = item.agregados[0].split(',').map(s => s.trim()).filter(s => s !== '');
+                    
+                    agregadosHTML = `
+                        <div class="mt-3 bg-blue-50/50 rounded-lg p-3 border border-blue-100 w-full">
+                            <p class="text-xs font-bold text-blue-700 uppercase mb-2">Agregados:</p>
+                            <ul class="space-y-1.5">
+                                ${lista.map(agregado => `
+                                    <li class="flex items-start text-sm text-gray-700 font-medium">
+                                        <svg class="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        ${agregado}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
                 card.innerHTML = `
                     <div class="flex-shrink-0 relative">
                         <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-xl bg-gray-100 border overflow-hidden">
@@ -103,7 +126,7 @@
                         <p class="text-gray-800 font-semibold text-base mb-1">${item.publicationName || 'Sin nombre'}</p>
                         ${item.variation ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-md font-bold mb-2 inline-block">Var: ${item.variation}</span>` : ''}
                         <p class="text-xs text-gray-500 font-bold uppercase">SKU: ${item.subtitle}</p>
-                        ${item.agregados.length ? `<div class="mt-2 p-2 bg-blue-50 rounded-lg text-sm text-blue-800"><b>Agregados:</b> ${item.agregados.join(', ')}</div>` : ''}
+                        ${agregadosHTML}
                     </div>
                 `;
                 resultsContainer.appendChild(card);
