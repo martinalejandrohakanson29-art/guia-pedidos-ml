@@ -46,7 +46,6 @@ app.use(express.static(__dirname));
 
 // --- 3. FUNCIONES DE BASE DE DATOS ---
 
-// Obtiene los envíos disponibles
 async function getRecentShipments() {
     try {
         const res = await pool.query('SELECT id, name FROM "Shipment" ORDER BY "createdAt" DESC LIMIT 10');
@@ -59,7 +58,7 @@ async function getRecentShipments() {
 
 // --- 4. ENDPOINTS API ---
 
-// Lista de envíos para el dropdown
+// Lista de envíos para el dropdown (Enviamos ID y Nombre)
 app.get('/api/envio-id', async (req, res) => {
     try {
         const shipments = await getRecentShipments();
@@ -69,36 +68,41 @@ app.get('/api/envio-id', async (req, res) => {
     }
 });
 
-// NUEVO: Obtiene los items de un envío específico
-app.get('/api/shipment-items', async (req, res) => {
-    const shipmentName = req.query.name;
-    if (!shipmentName) return res.status(400).json({ error: 'Falta el nombre del envío' });
+// BÚSQUEDA: Ahora consulta la tabla ShipmentItem filtrando por shipmentId
+app.get('/api/search', async (req, res) => {
+    const { q, shipmentId } = req.query;
+    
+    if (!shipmentId) return res.status(400).json({ error: 'Falta el ID del envío' });
 
     try {
-        // Hacemos un JOIN entre Shipment y ShipmentItem para filtrar por el nombre del envío
+        // Buscamos coincidencias en SKU, Título o ItemId (MLA)
         const query = `
-            SELECT si.* FROM "ShipmentItem" si
-            JOIN "Shipment" s ON si."shipmentId" = s.id
-            WHERE s.name = $1
+            SELECT * FROM "ShipmentItem" 
+            WHERE "shipmentId" = $1 
+            AND (
+                "itemId" ILIKE $2 OR 
+                "title" ILIKE $2 OR 
+                "sku" ILIKE $2
+            )
+            LIMIT 50
         `;
-        const result = await pool.query(query, [shipmentName]);
+        const values = [shipmentId, `%${q}%`];
+        const result = await pool.query(query, values);
         
-        // Mapeamos los datos para que el frontend los entienda
+        // Mapeamos los datos para el frontend
         const formattedResults = result.rows.map(row => ({
-            title: row.itemId, // Usamos el MLA como título principal
+            title: row.itemId, 
             subtitle: row.sku,
-            publicationName: row.title, // Nombre largo del producto
+            publicationName: row.title,
             variation: row.variation,
             image: row.imageUrl,
-            envio: shipmentName,
-            quantity: row.quantity,
-            // Si agregados es un string, lo metemos en un array para que el frontend no falle
+            envio: 'Cargado desde DB',
             agregados: row.agregados ? [row.agregados] : [] 
         }));
         
         res.json(formattedResults);
     } catch (error) {
-        console.error('Error obteniendo items:', error);
+        console.error('Error en búsqueda:', error);
         res.status(500).json({ error: 'Error en el servidor' });
     }
 });
@@ -111,7 +115,11 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     if (!file || !itemId || !envioId) return res.status(400).json({ error: 'Faltan datos' });
 
     try {
-        const safeEnvioId = envioId.replace(/[^a-zA-Z0-9-_]/g, '_');
+        // Obtenemos el nombre real del envío para crear la carpeta
+        const shipRes = await pool.query('SELECT name FROM "Shipment" WHERE id = $1', [envioId]);
+        const envioName = shipRes.rows.length > 0 ? shipRes.rows[0].name : envioId;
+
+        const safeEnvioId = envioName.toString().replace(/[^a-zA-Z0-9-_]/g, '_');
         let folderName = itemId;
         if (itemName && itemName !== 'undefined' && itemName.trim() !== '') {
             folderName = `${itemId} - ${itemName}`;
