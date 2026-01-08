@@ -87,8 +87,9 @@ app.get('/api/search', async (req, res) => {
             publicationName: row.title,
             variation: row.variation,
             image: row.imageUrl,
-            quantity: row.quantity, // <--- AGREGADO: Se incluye la cantidad de la DB
+            quantity: row.quantity,
             envio: 'Cargado desde DB',
+            // Enviamos el contenido de agregados tal cual (puede ser un string con comas)
             agregados: row.agregados ? [row.agregados] : [] 
         }));
         
