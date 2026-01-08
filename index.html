@@ -15,7 +15,6 @@
             min-height: 100vh;
         }
 
-        /* Glassmorphism Classes */
         .glass {
             background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(10px);
@@ -38,7 +37,6 @@
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
         }
 
-        /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -84,7 +82,7 @@
             </button>
         </div>
 
-        <p class="text-gray-500 mb-8">Busca por Item ID, Inventario o Nombre</p>
+        <p class="text-gray-500 mb-8">Busca por Item ID (MLA), SKU o Nombre en el envío seleccionado</p>
 
         <div class="relative w-full">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -108,7 +106,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-500">No se encontraron resultados</h3>
+            <h3 class="mt-2 text-sm font-medium text-gray-500">No se encontraron resultados en este envío</h3>
         </div>
     </div>
 
@@ -128,7 +126,7 @@
         const resultsContainer = document.getElementById('resultsContainer');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const emptyState = document.getElementById('emptyState');
-        const envioIdSelect = document.getElementById('envioIdSelect'); // MODIFICADO
+        const envioIdSelect = document.getElementById('envioIdSelect');
         const refreshBtn = document.getElementById('refreshBtn');
         const fileInput = document.getElementById('fileInput');
         const finalizeBtn = document.getElementById('finalizeBtn');
@@ -137,24 +135,23 @@
         let currentUploadItemId = null; 
         let currentUploadItemName = null;
 
-        // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
             fetchEnvioId();
         });
 
-        // --- LÓGICA DE ENVÍO ID (MODIFICADA PARA DB) ---
+        // Obtiene la lista de envíos (ahora procesa objetos id/name)
         async function fetchEnvioId() {
             try {
                 const response = await fetch('/api/envio-id');
                 const data = await response.json();
                 
-                envioIdSelect.innerHTML = ''; // Limpiar opciones
+                envioIdSelect.innerHTML = '';
 
                 if (data.shipments && data.shipments.length > 0) {
-                    data.shipments.forEach(id => {
+                    data.shipments.forEach(shipment => {
                         const option = document.createElement('option');
-                        option.value = id;
-                        option.textContent = id;
+                        option.value = shipment.id; // El ID de la tabla Shipment
+                        option.textContent = shipment.name; // El número de envío visible
                         envioIdSelect.appendChild(option);
                     });
                 } else {
@@ -171,13 +168,11 @@
         refreshBtn.addEventListener('click', async () => {
             refreshBtn.classList.add('animate-spin');
             try {
-                // Forzamos actualización de IDs consultando la DB y refrescando productos
-                await fetch('/api/refresh', { method: 'POST' });
                 await fetchEnvioId();
                 Swal.fire({
                     icon: 'success',
                     title: 'Lista Actualizada',
-                    text: 'Se cargaron los envíos más recientes.',
+                    text: 'Se cargaron los envíos más recientes de la base de datos.',
                     timer: 1500,
                     showConfirmButton: false
                 });
@@ -189,17 +184,16 @@
         });
 
         finalizeBtn.addEventListener('click', () => {
-            const envioActual = envioIdSelect.value;
+            const envioActualNombre = envioIdSelect.options[envioIdSelect.selectedIndex].text;
             Swal.fire({
                 title: '¡Proceso Terminado!',
-                text: `Has terminado la preparación del lote para: ${envioActual}`,
+                text: `Has terminado la preparación del envío: ${envioActualNombre}`,
                 icon: 'success',
                 confirmButtonText: 'Entendido',
                 confirmButtonColor: '#3b82f6'
             });
         });
 
-        // --- BÚSQUEDA ---
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
             clearTimeout(debounceTimer);
@@ -214,9 +208,16 @@
             }, 300);
         });
 
+        // BÚSQUEDA: Envía el q y el shipmentId seleccionado
         async function fetchResults(query) {
+            const shipmentId = envioIdSelect.value;
+            if (!shipmentId || shipmentId === 'Cargando...') {
+                loadingSpinner.classList.add('hidden');
+                return;
+            }
+
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&shipmentId=${shipmentId}`);
                 const data = await response.json();
                 renderResults(data);
             } catch (error) {
@@ -248,11 +249,6 @@
                     ? 'object-cover' 
                     : 'object-contain p-2 opacity-50';
 
-                let envioColorClass = 'bg-gray-100 text-gray-600 border-gray-200';
-                if (item.envio.toLowerCase().includes('full')) envioColorClass = 'bg-green-50 text-green-700 border-green-200';
-                if (item.envio.toLowerCase().includes('flex')) envioColorClass = 'bg-yellow-50 text-yellow-700 border-yellow-200';
-                if (item.envio.toLowerCase().includes('colecta')) envioColorClass = 'bg-blue-50 text-blue-700 border-blue-200';
-
                 let agregadosHTML = '';
                 if (item.agregados && item.agregados.length > 0) {
                     agregadosHTML = `
@@ -271,7 +267,7 @@
                     `;
                 }
 
-                const safeName = (item.publicationName || item.subtitle || '').replace(/"/g, '&quot;');
+                const safeName = (item.publicationName || '').replace(/"/g, '&quot;');
 
                 card.innerHTML = `
                     <div class="flex-shrink-0">
@@ -279,7 +275,7 @@
                             <img src="${imagenSrc}" 
                                  alt="Producto" 
                                  class="w-full h-full ${imgStyle} transition-opacity duration-500"
-                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png'; this.className='w-full h-full object-contain p-2 opacity-50'">
+                                 onerror="this.src='https://http2.mlstatic.com/frontend-assets/ui-navigation/5.18.9/mercadolibre/logo__small.png';">
                         </div>
                     </div>
 
@@ -289,9 +285,6 @@
                                 ${item.title}
                             </h2>
                             <div class="flex items-center gap-2">
-                                <span class="px-3 py-1 rounded-md text-xs font-bold border ${envioColorClass}">
-                                    ${item.envio}
-                                </span>
                                 <button onclick="triggerUpload('${item.title}', this.getAttribute('data-name'))" 
                                         data-name="${safeName}"
                                         class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" 
@@ -338,13 +331,13 @@
             }
         });
 
-        // --- SUBIDA DE FOTO MODIFICADA: Ahora usa el Envío seleccionado ---
         async function uploadPhoto(file, itemId) {
-            const selectedEnvioId = envioIdSelect.value; // MODIFICADO
+            const selectedEnvioId = envioIdSelect.value;
+            const selectedEnvioNombre = envioIdSelect.options[envioIdSelect.selectedIndex].text;
 
             Swal.fire({
                 title: 'Subiendo foto...',
-                html: `Destino: <b>${selectedEnvioId}</b><br>Por favor espera.`,
+                html: `Envío: <b>${selectedEnvioNombre}</b><br>Por favor espera.`,
                 allowOutsideClick: false,
                 didOpen: () => { Swal.showLoading(); }
             });
@@ -353,7 +346,7 @@
             formData.append('photo', file);
             formData.append('itemId', itemId);
             formData.append('itemName', currentUploadItemName);
-            formData.append('envioId', selectedEnvioId); // MODIFICADO
+            formData.append('envioId', selectedEnvioId);
 
             try {
                 const response = await fetch('/api/upload', {
@@ -366,7 +359,7 @@
                     Swal.fire({
                         icon: 'success',
                         title: '¡Foto subida!',
-                        text: `La imagen se guardó en la carpeta del envío: ${selectedEnvioId}`,
+                        text: `Imagen guardada en la carpeta del envío: ${selectedEnvioNombre}`,
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -386,9 +379,3 @@
 </body>
 
 </html>
-
-
-
-
-
-
