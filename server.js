@@ -1,11 +1,9 @@
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-const { google } = require('googleapis');
 const multer = require('multer');
-const stream = require('stream');
 const { Pool } = require('pg');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,24 +14,18 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false } 
 });
 
-// --- 2. CONFIGURACIÓN GOOGLE DRIVE ---
-const DRIVE_PARENT_FOLDER_ID = '1v-E638QF0AaPr7zywfH2luZvnHXtJujp';
+// --- 2. CONFIGURACIÓN DEL BUCKET S3 (Railway) ---
+const s3Client = new S3Client({
+    region: process.env.S3_REGION || "auto",
+    endpoint: process.env.S3_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    },
+    forcePathStyle: true,
+});
 
-let drive;
-try {
-    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
-        const oAuth2Client = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            "https://developers.google.com/oauthplayground"
-        );
-        oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-        drive = google.drive({ version: 'v3', auth: oAuth2Client });
-        console.log('✅ Autenticación OAuth2 configurada correctamente.');
-    }
-} catch (error) {
-    console.error("ERROR DRIVE:", error);
-}
+const BUCKET_NAME = process.env.S3_BUCKET_NAME;
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -45,7 +37,6 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 // --- 3. FUNCIONES DE BASE DE DATOS ---
-
 async function getRecentShipments() {
     try {
         const res = await pool.query('SELECT id, name FROM "Shipment" ORDER BY "createdAt" DESC LIMIT 10');
@@ -89,7 +80,6 @@ app.get('/api/search', async (req, res) => {
             image: row.imageUrl,
             quantity: row.quantity,
             envio: 'Cargado desde DB',
-            // Enviamos el contenido de agregados tal cual (puede ser un string con comas)
             agregados: row.agregados ? [row.agregados] : [] 
         }));
         
@@ -100,52 +90,38 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
+/**
+ * NUEVO ENDPOINT DE SUBIDA AL BUCKET
+ */
 app.post('/api/upload', upload.single('photo'), async (req, res) => {
-    const { itemId, itemName, envioId } = req.body;
+    const { itemId, envioId } = req.body;
     const file = req.file;
-    if (!file || !itemId || !envioId) return res.status(400).json({ error: 'Faltan datos' });
+
+    if (!file || !itemId || !envioId) {
+        return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
 
     try {
-        const shipRes = await pool.query('SELECT name FROM "Shipment" WHERE id = $1', [envioId]);
-        const envioName = shipRes.rows.length > 0 ? shipRes.rows[0].name : envioId;
-        const safeEnvioId = envioName.toString().replace(/[^a-zA-Z0-9-_]/g, '_');
-        let folderName = itemId;
-        if (itemName && itemName !== 'undefined' && itemName.trim() !== '') {
-            folderName = `${itemId} - ${itemName}`;
-        }
-        const safeFolderName = folderName.replace(/[/\\?%*:|"<>]/g, '').trim();
-        const envioFolderId = await findOrCreateFolder(safeEnvioId, DRIVE_PARENT_FOLDER_ID);
-        const itemFolderId = await findOrCreateFolder(safeFolderName, envioFolderId);
-        await uploadFileToDrive(file, itemFolderId);
-        res.json({ success: true });
+        // Armamos la ruta del archivo: auditoria/ID_ENVIO/MLA_FECHA.jpg
+        const fileName = `auditoria/${envioId}/${itemId}_${Date.now()}.jpg`;
+
+        const command = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: fileName,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+        });
+
+        await s3Client.send(command);
+
+        console.log(`✅ Foto subida al Bucket: ${fileName}`);
+        res.json({ success: true, path: fileName });
+
     } catch (error) {
+        console.error('ERROR SUBIDA BUCKET:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-async function findOrCreateFolder(folderName, parentId) {
-    if (!drive) throw new Error("Google Drive no configurado.");
-    let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
-    if (parentId) query += ` and '${parentId}' in parents`;
-    const res = await drive.files.list({ q: query, fields: 'files(id, name)' });
-    if (res.data.files.length > 0) return res.data.files[0].id;
-    const file = await drive.files.create({
-        resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : [] },
-        fields: 'id',
-    });
-    return file.data.id;
-}
-
-async function uploadFileToDrive(fileObject, parentFolderId) {
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileObject.buffer);
-    const file = await drive.files.create({
-        resource: { name: fileObject.originalname, parents: [parentFolderId] },
-        media: { mimeType: fileObject.mimetype, body: bufferStream },
-        fields: 'id',
-    });
-    return file.data.id;
-}
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.listen(PORT, () => console.log(`🚀 Servidor listo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Servidor de Guía listo en puerto ${PORT}`));
